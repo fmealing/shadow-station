@@ -1,7 +1,7 @@
 import unittest
 
-from station.tracking import (FINGERS, HAND_REACH, fingers_up, pose_pointer,
-                              reach_to_screen)
+from station.tracking import (FINGERS, HAND_REACH, fingers_up, pick_hand,
+                              pose_pointer, reach_to_screen)
 
 W, H = 720, 1280  # the portrait canvas
 SHOULDER_HALF = 0.1  # frame fractions; shoulder width = 144 px
@@ -51,9 +51,22 @@ class PosePointerTest(unittest.TestCase):
         _, y = pose_pointer(body(hand_y=0.4 + 0.5 * UNIT_Y), W, H)
         self.assertGreater(y, 0.7)
 
-    def test_picks_the_higher_hand(self):
+    def test_right_hand_points(self):
+        # 15-19 are the user's right hand in the mirrored frames.
         x, _ = pose_pointer(body(hand_y=0.2, hand_x=0.65), W, H)
         self.assertGreater(x, 0.5)
+
+    def test_right_hand_points_even_when_the_left_is_higher(self):
+        lms = body(hand_y=0.3, hand_x=0.65)
+        for i in (16, 18, 20):
+            lms[i] = (0.35, 0.2, 1.0)
+        x, _ = pose_pointer(lms, W, H)
+        self.assertGreater(x, 0.5)
+
+    def test_left_hand_points_while_the_right_is_down(self):
+        # With --hand left, the raised hand here is the other one, and the
+        # pointing one hangs by the hip, out of reach.
+        self.assertIsNotNone(pose_pointer(body(hand_y=0.2), W, H, "left"))
 
     def test_same_gesture_same_point_at_any_distance(self):
         # Halve the body's size in frame (twice as far away): the same
@@ -78,6 +91,35 @@ class PosePointerTest(unittest.TestCase):
         lms = body(hand_y=0.2)
         lms[11] = (0.55, 0.4, 0.1)
         self.assertIsNone(pose_pointer(lms, W, H))
+
+
+RIGHT_PALM, LEFT_PALM = (0.6, 0.5), (0.3, 0.5)
+
+
+class PickHandTest(unittest.TestCase):
+    def test_nothing_in_view(self):
+        self.assertIsNone(pick_hand([], None))
+
+    def test_the_right_hand_of_two_wins_either_way_round(self):
+        right, left = (0.95, RIGHT_PALM), (0.03, LEFT_PALM)
+        self.assertEqual(pick_hand([right, left], None), 0)
+        self.assertEqual(pick_hand([left, right], None), 1)
+
+    def test_two_unsure_labels_still_compare(self):
+        self.assertEqual(pick_hand([(0.3, LEFT_PALM), (0.45, RIGHT_PALM)],
+                                   None), 1)
+
+    def test_the_right_hand_alone_is_followed(self):
+        self.assertEqual(pick_hand([(0.9, RIGHT_PALM)], None), 0)
+
+    def test_the_left_hand_alone_is_ignored(self):
+        self.assertIsNone(pick_hand([(0.05, LEFT_PALM)], None))
+        self.assertIsNone(pick_hand([(0.05, LEFT_PALM)], RIGHT_PALM))
+
+    def test_a_flickering_label_does_not_drop_the_right_hand(self):
+        # Called the left hand for a frame, but where the right one just was.
+        moved = (RIGHT_PALM[0] + 0.05, RIGHT_PALM[1] - 0.05)
+        self.assertEqual(pick_hand([(0.2, moved)], RIGHT_PALM), 0)
 
 
 def hand(curled=()):

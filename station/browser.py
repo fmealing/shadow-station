@@ -1,10 +1,11 @@
 """Chrome, driven over the DevTools protocol.
 
-The station launches its own Chrome with its own profile, so a TikTok login
-lives there and nowhere else, and drives the page directly: the hand cursor
-becomes mouse moves and clicks, gestures become key presses and scrolls.
-Input sent this way reaches the page whether or not Chrome has focus, so the
-camera window never has to fight Chrome for it.
+The station opens its UI in its own Chrome, with its own profile, as an app
+window (no tabs or address bar) or in kiosk mode on the station's monitor.
+Over the DevTools connection the station notices the window has closed, and
+TikTok mode takes the window over: the hand cursor becomes mouse moves and
+clicks, gestures become key presses. Input sent this way reaches the page
+whether or not Chrome has focus.
 """
 
 import base64
@@ -17,7 +18,7 @@ from pathlib import Path
 import websocket
 
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-# Outside the repo: it holds login cookies.
+# Outside the repo: it holds TikTok's login cookies.
 PROFILE = Path.home() / ".shadow-station" / "chrome"
 
 KEY_CODES = {"ArrowDown": 40, "ArrowUp": 38, "Enter": 13, "Escape": 27}
@@ -33,13 +34,18 @@ class Chrome:
              # 0 picks a free port; Chrome writes it to DevToolsActivePort.
              "--remote-debugging-port=0",
              "--no-first-run", "--no-default-browser-check",
-             # Videos start with sound without a click first.
+             # TikTok's videos start with sound, without a click first.
              "--autoplay-policy=no-user-gesture-required",
+             # Pages that follow the system theme come up dark: TikTok is
+             # filmed in its dark mode. The station's own page is light.
+             "--force-dark-mode", "--hide-scrollbars",
              f"--window-position={position[0]},{position[1]}",
              f"--window-size={size[0]},{size[1]}",
              f"--app={url}", *extra_args],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         port = _wait_for_port(port_file, self._proc)
+        self._port = port
+        self._checked, self._open = 0.0, True
         ws_url = _page_target(port)["webSocketDebuggerUrl"]
         # Chrome refuses DevTools sockets that carry an Origin header.
         self._ws = websocket.create_connection(ws_url, timeout=30,
@@ -79,13 +85,22 @@ class Chrome:
             self.send("Input.dispatchMouseEvent", type=kind, x=x, y=y,
                       button="left", clickCount=1)
 
-    def scroll(self, x, y, dy):
-        self.send("Input.dispatchMouseEvent", type="mouseWheel", x=x, y=y,
-                  deltaX=0, deltaY=dy)
-
     def screenshot(self, path):
         data = self.send("Page.captureScreenshot", format="png")["data"]
         Path(path).write_bytes(base64.b64decode(data))
+
+    def alive(self):
+        """Whether the page is still open. On macOS, closing the window
+        leaves Chrome running, so this asks Chrome for its pages, at most
+        once a second."""
+        now = time.monotonic()
+        if now - self._checked >= 1.0:
+            self._checked = now
+            try:
+                self._open = bool(_pages(self._port))
+            except OSError:
+                self._open = False
+        return self._open
 
     def close(self):
         try:
@@ -112,9 +127,14 @@ def _wait_for_port(port_file, proc, timeout=20):
 def _page_target(port, timeout=20):
     end = time.monotonic() + timeout
     while time.monotonic() < end:
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/list") as r:
-            pages = [t for t in json.load(r) if t.get("type") == "page"]
+        pages = _pages(port)
         if pages:
             return pages[0]
         time.sleep(0.1)
     raise RuntimeError("Chrome started but opened no page")
+
+
+def _pages(port):
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/list",
+                                timeout=2) as r:
+        return [t for t in json.load(r) if t.get("type") == "page"]

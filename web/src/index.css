@@ -1,0 +1,182 @@
+@import "tailwindcss";
+
+/* Shadow's design system (shadow_ai/docs/product/design-system.md in the app),
+   dark theme: GhostColours' dark tokens in lib/theme/app_theme.dart. The
+   station is filmed and read from across a room, so secondary text is a step
+   lighter than the app's slate, which stays for borders and dividers. */
+@theme {
+  --color-primary: #3a7bd5;
+  --color-secondary: #5ba3f5;
+  --color-ink: #e8eff8;
+  --color-slate: #4a6080; /* borders and dividers */
+  --color-muted: #8fa3bf; /* secondary text */
+  --color-bg: #0d1117;
+  --color-card: #111827;
+  --color-input: #1a2436; /* wells and tracks, a step up from the card */
+  --color-warning: #e0a030;
+  --color-warning-ink: #f2c063; /* warning as text */
+  --color-success: #4caf50;
+  --color-low: #1a3a6b; /* intensity 0; the ramp ends at primary */
+
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+
+  --radius-card: 1rem;
+  --radius-button: 0.875rem;
+  --radius-pill: 1.875rem;
+
+  /* On the dark background a card is lifted by its border; the shadow only
+     separates it from the camera behind. Glow is what hovered things wear. */
+  --shadow-card: 0 0.25rem 1.5rem rgb(0 0 0 / 0.4);
+  --shadow-float: 0 0.75rem 3rem rgb(0 0 0 / 0.55);
+  --shadow-glow: 0 0 0 0.25rem rgb(58 123 213 / 0.35), 0 0 2.75rem rgb(58 123 213 / 0.5);
+
+  --animate-pop: pop 380ms cubic-bezier(0.2, 0.9, 0.3, 1.3);
+  --animate-fade: fade 240ms ease-out;
+  --animate-rise: rise 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-pulse-dot: pulse-dot 1.6s ease-in-out infinite;
+  --animate-flash: flash 450ms ease-out forwards;
+  --animate-ring: ring 700ms ease-out forwards;
+  --animate-draw: draw 1400ms cubic-bezier(0.3, 0.1, 0.2, 1) both;
+  --animate-grow: grow 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-slap: slap 480ms cubic-bezier(0.3, 0.7, 0.3, 1) both;
+
+  @keyframes pop {
+    0% { transform: scale(0.82); opacity: 0.4; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(1.25rem); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes flash {
+    from { opacity: 0.85; }
+    to { opacity: 0; }
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+  /* A ring thrown out from behind the count as a rep lands. */
+  @keyframes ring {
+    from { transform: scale(0.55); opacity: 0.9; }
+    to { transform: scale(1.5); opacity: 0; }
+  }
+  /* A chart line drawn from its start; the path has pathLength 1. */
+  @keyframes draw {
+    from { stroke-dashoffset: 1; }
+    to { stroke-dashoffset: 0; }
+  }
+  @keyframes grow {
+    from { transform: scaleY(0); }
+    to { transform: scaleY(1); }
+  }
+  /* A sticker slapped onto the screen: in from close up, and left askew. */
+  @keyframes slap {
+    0% { transform: scale(2.1) rotate(-12deg); opacity: 0; }
+    55% { transform: scale(0.95) rotate(6deg); opacity: 1; }
+    78% { transform: scale(1.03) rotate(3deg); }
+    100% { transform: scale(1) rotate(4deg); }
+  }
+}
+
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/fonts/SpaceGrotesk-Regular.ttf") format("truetype");
+  font-weight: 400;
+}
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/fonts/SpaceGrotesk-Medium.ttf") format("truetype");
+  font-weight: 500;
+}
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/fonts/SpaceGrotesk-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+}
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/fonts/SpaceGrotesk-Bold.ttf") format("truetype");
+  font-weight: 700;
+}
+
+/* The stage is the station's 9:16 portrait screen, as big as the window
+   allows. 1rem is 1/45 of its width: 16px on the 720px design canvas, 24px
+   on the station's 1080px monitor. Every size in the UI is in rem, so the
+   whole layout scales with the stage. */
+html {
+  font-size: calc(min(100vw, 100vh * 9 / 16) / 45);
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #05070b;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  cursor: none;
+  user-select: none;
+}
+
+#root {
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.eyebrow {
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A surface over the camera: the card colour, see-through, with a hairline
+   of light for an edge. */
+.glass {
+  background: rgb(17 24 39 / 0.78);
+  border: 1px solid rgb(232 239 248 / 0.1);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(0.75rem);
+}
+
+/* Big numbers over the camera: lit from behind in the brand blue, so they
+   hold against whatever the room looks like. In the warning's amber while
+   the reps are stopping short. */
+.lit {
+  text-shadow:
+    0 0 1.5rem rgb(58 123 213 / 0.85),
+    0 0.15rem 0.5rem rgb(0 0 0 / 0.6);
+}
+
+.lit-warn {
+  text-shadow:
+    0 0 1.5rem rgb(224 160 48 / 0.85),
+    0 0.15rem 0.5rem rgb(0 0 0 / 0.6);
+}
+
+/* A meme's words, the way memes wear them: tall white capitals edged in
+   black. Impact comes with the station's Mac. */
+.meme {
+  font-family: Impact, Haettenschweiler, "Arial Narrow Bold", var(--font-sans);
+  font-size: 1.9rem;
+  line-height: 1.08;
+  letter-spacing: 0.01em;
+  text-align: center;
+  text-transform: uppercase;
+  color: #fff;
+  -webkit-text-stroke: 0.17em #000;
+  paint-order: stroke fill;
+}

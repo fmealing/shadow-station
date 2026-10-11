@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+"""`quit-apps`, from any terminal: quit the other apps to free memory.
+
+Linked onto the PATH (see Memory in the README). Python looks for `station`
+beside the real file, so the link can live anywhere.
+"""
+from station.preflight import main
+
+try:
+    main()
+except KeyboardInterrupt:
+    print()

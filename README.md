@@ -242,6 +242,23 @@ cue, so it goes before the hand reaches it. The clinic's abduction set has
 no line for it and shows nothing: there, how far the arm gets is what is
 being measured.
 
+Counting them is a second thing. The live counter's bands sit at 30% and
+70% of the range the set has shown so far, so it takes reps that are short
+from the first one, and lets go by reps that shrink part-way through a set
+(under about 70% of the earlier ones) and reps that stop coming back down.
+Auto-finish and the tail cut go by the count, so those sets used to end
+themselves 10 s after the last rep it took, with the lifter still lifting,
+and the summary lost the rest: 4 full made-up reps and then 6 half ones
+read 4 live and 5 on the summary. The analysis afterwards counts by
+prominence (35% of the set's range) and takes them all, so `Uncounted` in
+`station/halfreps.py` keeps that rule running during the set, on the live
+counter's own smoothed angle and range. While the live counter takes each
+rep its number stands. Once it has let two running go by (`LET_BY`), the
+number on screen is `Uncounted`'s for the rest of the set, and jumps by
+two as it takes over; the terminal says when. That set now reads 10 live
+and 10 on the summary, and ends 10 s after its last rep. `station/reps.py`
+is untouched, and still what the app runs.
+
 ## Physique
 
 `station/physique.py`. The pose model gives a mask of which pixels are the
@@ -332,17 +349,14 @@ The engine owns all the state, so reloading the page loses nothing.
   Finish and the toggle. An overhead press would put a hand in the
   top-right zone or on Finish. Other exercises will need the controls
   locked while a set is running.
-- **Short reps the count drops.** The live counter's bands sit at fractions
-  of the range the set has shown so far. Reps that are short from the first
-  one are counted. Reps that shrink part-way through a set are not, once
-  they get less than about 70% of the way the earlier ones did, and neither
-  are reps that stop coming back down (staying above about 30% of the way
-  up). Auto-finish and the tail cut both go by the live counter's last rep,
-  so the summary loses them too, and the set can end itself while they are
-  still being lifted: 4 full made-up reps and then 6 half ones read 4 live
-  and 5 on the summary. The analysis counts all 10 when it is given the
-  whole recording. The half-rep cue comes up in both cases, over a count
-  that has stopped.
+- **Short reps, counted beside the lab's counter.** `Uncounted` (see Half
+  reps above) is the station's own and has only met made-up sets: 264 of
+  them where the live counter takes every rep, on which the number never
+  differed from the lab's, and the short-rep sets in the tests. It has not
+  met the lab's captures. Where it could go wrong is a reading that swings
+  by a third of its range twice within one rep, which a curl facing the
+  camera is the likeliest to do. One short rep between full ones is still
+  not counted live (the summary has it): one let by could be a stray turn.
 - **Half-rep thresholds and targets.** `FULL` in `station/halfreps.py` is
   from one filmed set of lateral raises and from geometry, and has only met
   made-up sets. A curl facing the camera is the one to try first: its elbow

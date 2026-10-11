@@ -1,7 +1,7 @@
 import math
 import unittest
 
-from station.halfreps import BOTTOM, FULL, RUN, STALE_S, TOP, HalfReps
+from station.halfreps import BOTTOM, FULL, LET_BY, RUN, STALE_S, TOP, HalfReps, Uncounted
 
 FPS = 30
 DT = 1 / FPS
@@ -126,6 +126,71 @@ class HalfRepsTest(unittest.TestCase):
         self.assertEqual(said[-1], TOP)
         said, _ = watch(HalfReps("elbow"), lift([top_min + 30] * 5, low=bottom_max + 20))
         self.assertEqual(said[-1], BOTTOM)
+
+
+class UncountedTest(unittest.TestCase):
+    """The count that takes the reps the live counter lets go by. Here the
+    live counter is played by hand: it takes a rep on the way up, or not."""
+
+    RANGE = HIGH - REST
+
+    def lift(self, u, tops, taken, count=0):
+        """Reps to each of `tops`; the live counter takes those in `taken`
+        (by position). Returns its count after."""
+        for i, top in enumerate(tops):
+            rep = lift([top])
+            for k, a in enumerate(rep):
+                if i in taken and k == len(rep) // 3:
+                    count += 1
+                u.update(a, self.RANGE, count)
+        return count
+
+    def test_the_live_counter_s_number_stands_while_it_counts(self):
+        u = Uncounted(rest_at_max=False)
+        count = self.lift(u, [HIGH] * 6, taken=range(6))
+        self.assertEqual(u.reps(count), 6)
+        self.assertFalse(u.took_over)
+
+    def test_reps_it_lets_go_by_are_counted(self):
+        u = Uncounted(rest_at_max=False)
+        count = self.lift(u, [HIGH] * 3, taken=range(3))
+        # One let by could be a stray turn: not yet.
+        count = self.lift(u, [HALF] * (LET_BY - 1), taken=(), count=count)
+        self.assertEqual(u.reps(count), 3)
+        count = self.lift(u, [HALF] * 4, taken=(), count=count)
+        self.assertTrue(u.took_over)
+        self.assertEqual(count, 3)
+        self.assertEqual(u.reps(count), 3 + LET_BY - 1 + 4)
+
+    def test_one_let_by_between_reps_it_takes_is_forgotten(self):
+        u = Uncounted(rest_at_max=False)
+        count = self.lift(u, [HIGH, HALF, HIGH, HIGH, HALF, HIGH], taken=(0, 2, 3, 5))
+        self.assertFalse(u.took_over)
+        self.assertEqual(u.reps(count), 4)
+
+    def test_once_it_has_taken_over_every_rep_is_its_own(self):
+        u = Uncounted(rest_at_max=False)
+        count = self.lift(u, [HIGH] * 2, taken=range(2))
+        count = self.lift(u, [HALF] * 3, taken=(), count=count)
+        # The live counter picks up again; no rep is counted twice.
+        count = self.lift(u, [HIGH] * 3, taken=range(3), count=count)
+        self.assertEqual(count, 5)
+        self.assertEqual(u.reps(count), 8)
+
+    def test_a_curl_s_top_is_where_its_angle_is_least(self):
+        # The elbow rests straight, at the most of its angle.
+        u = Uncounted(rest_at_max=True)
+        count = 0
+        for a in lift([120.0] * 4, low=40.0):
+            u.update(180.0 - a, 130.0, count)
+        self.assertTrue(u.took_over)
+        self.assertEqual(u.reps(count), 4)
+
+    def test_nothing_is_counted_without_a_range(self):
+        u = Uncounted(rest_at_max=False)
+        for a in lift([REST + 10] * 6):
+            u.update(a, 10.0, 0)
+        self.assertEqual(u.reps(0), 0)
 
 
 if __name__ == "__main__":

@@ -216,11 +216,45 @@ class WorkoutTest(unittest.TestCase):
                 _, frames = make(reps=6, rest_before=1, rest_after=0)
                 self.assertEqual(self.said(ex, frames)[1], {None})
 
-    def test_reps_that_stop_short_of_the_bottom_are_said(self):
+    def test_reps_that_stop_short_of_the_bottom_are_said_and_counted(self):
+        # The live counter takes the first and lets the rest go by.
         for name, ex, make in (("raise", LATERAL_RAISE, raise_set), ("curl", CURL, curl_set)):
             with self.subTest(name):
                 _, frames = make(reps=6, low=0.5, rest_before=1, rest_after=0)
-                self.assertEqual(self.said(ex, frames)[1], {None, BOTTOM})
+                w, said = self.said(ex, frames)
+                self.assertEqual(said, {None, BOTTOM})
+                self.assertLess(w._live.count, 6)
+                self.assertEqual(w.reps, 6)
+                self.assertEqual(w.analysis.count, 6)
+
+    def test_reps_that_shrink_part_way_are_counted_and_the_set_goes_on(self):
+        for name, ex, make in (("raise", LATERAL_RAISE, raise_set), ("curl", CURL, curl_set)):
+            with self.subTest(name):
+                _, frames = make(reps=10, reach=[1.0] * 4 + [0.5] * 6,
+                                 rest_before=1, rest_after=0)
+                w, said = self.said(ex, frames)
+                self.assertEqual(said, {None, TOP})
+                self.assertEqual(w._live.count, 4)
+                self.assertTrue(w.took_over)
+                self.assertEqual(w.reps, 10)
+                self.assertEqual(w.analysis.count, 10)
+                # It ended 10 s after the last rep, not after the last one
+                # the live counter took, six reps before.
+                self.assertGreater(w.frames[-1][0], 1 + 10 * 2.5 + 8)
+
+    def test_the_live_counter_s_number_stands_on_reps_it_takes(self):
+        sets = (dict(reps=8), dict(reps=12, rep_s=1.2), dict(reps=10, slowdown=0.15),
+                dict(reps=8, other=0.0), dict(reps=8, reach=0.5), dict(reps=8, noise=0.006))
+        for name, ex, make in (("raise", LATERAL_RAISE, raise_set), ("curl", CURL, curl_set)):
+            for kw in sets:
+                with self.subTest(name, **kw):
+                    w = Workout(ex, auto_finish_s=10)
+                    t = start_recording(w)
+                    _, frames = make(rest_before=1, rest_after=0, **kw)
+                    for i, f in enumerate(frames + [standing()] * (11 * FPS)):
+                        t = run(w, [None if i % 7 == 0 else f], t)
+                        self.assertEqual(w.reps, w._live.count)
+                    self.assertFalse(w.took_over)
 
     def test_warns_when_you_leave_mid_set(self):
         w = Workout()

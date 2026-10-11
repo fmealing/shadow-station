@@ -120,6 +120,7 @@ class Engine:
         self.set_no = 0
         self.workout = None
         self._short = None         # the set's `short`, as last logged
+        self._took_over = False    # and whether its count had taken over
         self.summary = None
         self.physique = None
         self._mode_before = None   # the mode Physique was opened from
@@ -221,6 +222,10 @@ class Engine:
                 self._short = w.short
                 if w.short:
                     print(f"{t:8.2f}s  half reps: stopping short at the {w.short}")
+            if w.took_over and not self._took_over:
+                self._took_over = True
+                print(f"{t:8.2f}s  half reps: counting the ones the live "
+                      f"counter let by ({w.reps}, where it has {w._live.count})")
             header["live"] = self._live(t)
             header["skeletons"] = _skeletons(pose, hand)
             header["arms"] = _degrees(w.arms)
@@ -380,7 +385,7 @@ class Engine:
 
     def _to_workout(self):
         self.workout = Workout(self.exercise["counter"], self.auto_finish_s)
-        self._short = None
+        self._short, self._took_over = None, False
         self._replay = []
         self._go(WORKOUT)
 

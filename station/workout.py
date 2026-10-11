@@ -15,7 +15,9 @@ RECORDING  the live counter runs and every frame's landmarks are kept. Ends
 DONE       `analysis` holds the post-hoc result the summary shows.
 
 While recording, `short` says when the reps keep stopping short of the lift's
-full range (halfreps.py). They are counted all the same.
+full range (halfreps.py). They are counted all the same: `reps` is the live
+counter's number until it lets short reps go by, and then the count that
+takes them (halfreps.Uncounted).
 
 Like press.py, nothing here knows about cameras: it takes the pose each frame
 (33 landmarks as (x, y, visibility) canvas fractions, or None) and the time.
@@ -26,7 +28,7 @@ import math
 import numpy as np
 
 from . import reps
-from .halfreps import HalfReps
+from .halfreps import HalfReps, Uncounted
 
 PREROLL, COUNTDOWN, RECORDING, DONE = "preroll", "countdown", "recording", "done"
 
@@ -117,12 +119,19 @@ class Workout:
         self._seen = None
         self._live = reps.LiveRepCounter(exercise)
         self._half = HalfReps(exercise.joint)
+        self._uncounted = Uncounted(exercise.rest_at_max)
         self._last_count = 0
-        self._last_rep_t = None     # when the live count last went up
+        self._last_rep_t = None     # when the count last went up
 
     @property
     def reps(self):
-        return self._live.count
+        return self._uncounted.reps(self._live.count)
+
+    @property
+    def took_over(self):
+        """Whether the live counter let short reps go by and they are being
+        counted for it."""
+        return self._uncounted.took_over
 
     def countdown(self, t):
         if self.phase != COUNTDOWN:
@@ -224,12 +233,18 @@ class Workout:
         self._live.add(lms, rel)
         self.short = self._half.update(rel, self.arms)
         self.short_arms = self._half.arms
+        live = self._live
+        if live._ema is not None:
+            q = live.BAND_PERCENTILE
+            rng = (reps._sorted_percentile(live._hist, 100 - q)
+                   - reps._sorted_percentile(live._hist, q))
+            self._uncounted.update(live._ema, rng, live.count)
         if lms is not None:
             self._seen = t
         self.warning = ("Shadow lost you. Step back into view."
                         if t - self._seen > LOST_S else None)
-        if self._live.count != self._last_count:
-            self._last_count, self._last_rep_t = self._live.count, t
+        if self.reps != self._last_count:
+            self._last_count, self._last_rep_t = self.reps, t
         idle = (self.auto_finish_s and self._last_rep_t is not None
                 and t - self._last_rep_t >= self.auto_finish_s)
         if idle or rel >= MAX_SET_S:
